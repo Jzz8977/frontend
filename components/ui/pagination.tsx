@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ButtonProps, buttonVariants } from "@/components/ui/button"
 
-const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
+const PaginationRoot = ({ className, ...props }: React.ComponentProps<"nav">) => (
   <nav
     role="navigation"
     aria-label="pagination"
@@ -12,7 +12,7 @@ const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
     {...props}
   />
 )
-Pagination.displayName = "Pagination"
+PaginationRoot.displayName = "Pagination"
 
 const PaginationContent = React.forwardRef<
   HTMLUListElement,
@@ -43,6 +43,7 @@ type PaginationLinkProps = {
 const PaginationLink = ({
   className,
   isActive,
+  disabled,
   size = "icon",
   ...props
 }: PaginationLinkProps) => (
@@ -53,6 +54,7 @@ const PaginationLink = ({
         variant: isActive ? "outline" : "ghost",
         size,
       }),
+      disabled && "pointer-events-none opacity-50",
       className
     )}
     {...props}
@@ -106,6 +108,106 @@ const PaginationEllipsis = ({
   </span>
 )
 PaginationEllipsis.displayName = "PaginationEllipsis"
+
+// 自定义分页组件
+interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  className?: string;
+}
+
+// 包装现有组件，创建一个自定义组件
+function Pagination({ currentPage, totalPages, onPageChange, className }: PaginationProps) {
+  // 生成页码链接
+  const generatePaginationItems = () => {
+    // 计算显示的页码范围
+    let startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, startPage + 4);
+    
+    if (endPage - startPage < 4) {
+      startPage = Math.max(1, endPage - 4);
+    }
+    
+    const pages = [];
+    
+    // 添加"首页"链接（如果不在第一页）
+    if (startPage > 1) {
+      pages.push(
+        <PaginationItem key="first">
+          <PaginationLink onClick={() => onPageChange(1)}>1</PaginationLink>
+        </PaginationItem>
+      );
+      
+      // 添加省略号（如果首页和起始页之间有间隔）
+      if (startPage > 2) {
+        pages.push(
+          <PaginationItem key="ellipsis-start">
+            <PaginationEllipsis />
+          </PaginationItem>
+        );
+      }
+    }
+    
+    // 添加页码链接
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <PaginationItem key={i}>
+          <PaginationLink
+            isActive={i === currentPage}
+            onClick={() => onPageChange(i)}
+          >
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+    
+    // 添加省略号（如果结束页和末页之间有间隔）
+    if (endPage < totalPages - 1) {
+      pages.push(
+        <PaginationItem key="ellipsis-end">
+          <PaginationEllipsis />
+        </PaginationItem>
+      );
+    }
+    
+    // 添加"末页"链接（如果不在最后一页）
+    if (endPage < totalPages) {
+      pages.push(
+        <PaginationItem key="last">
+          <PaginationLink onClick={() => onPageChange(totalPages)}>
+            {totalPages}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+    
+    return pages;
+  };
+  
+  return (
+    <PaginationRoot className={className}>
+      <PaginationContent>
+        <PaginationItem>
+          <PaginationPrevious 
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))} 
+            disabled={currentPage <= 1}
+          />
+        </PaginationItem>
+        
+        {generatePaginationItems()}
+        
+        <PaginationItem>
+          <PaginationNext 
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} 
+            disabled={currentPage >= totalPages}
+          />
+        </PaginationItem>
+      </PaginationContent>
+    </PaginationRoot>
+  );
+}
 
 export {
   Pagination,

@@ -48,6 +48,7 @@ import {
 import { toast } from 'sonner';
 import { announcementAPI } from '@/lib/api';
 import { useForm } from 'react-hook-form';
+import { Pagination } from '@/components/ui/pagination';
 
 interface Announcement {
   _id: string;
@@ -106,11 +107,12 @@ export default function AnnouncementsPage() {
       setLoading(true);
       const filters = { keyword, type, status };
       const response = await announcementAPI.getAnnouncements(page, 10, filters);
-      setAnnouncements(response.data.data.data);
-      setTotalPages(response.data.data.totalPages);
+      setAnnouncements(response.data.data.data || []);
+      setTotalPages(response.data.data.totalPages || 1);
     } catch (error) {
       console.error('获取公告失败:', error);
       toast.error('获取公告列表失败');
+      setAnnouncements([]);
     } finally {
       setLoading(false);
     }
@@ -310,7 +312,7 @@ export default function AnnouncementsPage() {
                     加载中...
                   </TableCell>
                 </TableRow>
-              ) : announcements.length === 0 ? (
+              ) : !announcements || announcements.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-10">
                     暂无公告数据
@@ -740,6 +742,16 @@ export default function AnnouncementsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-4">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={(p) => setPage(p)}
+          />
+        </div>
+      )}
     </div>
   );
 } 

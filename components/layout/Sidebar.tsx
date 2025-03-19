@@ -13,7 +13,8 @@ import {
   MessageSquare,
   Shield,
   ClipboardList,
-  Sliders
+  Sliders,
+  UserCog
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store/authStore';
 
@@ -44,7 +45,7 @@ const Sidebar = () => {
   const { user, logout } = useAuthStore();
   
   // 根据用户角色控制显示的菜单项
-  const isAdmin = user && (user.role === 'admin' || user.role === 'superadmin');
+  const isAdmin = user && (user.roleKey === 'admin' || user.roleKey === 'superadmin');
   
   return (
     <aside className="flex flex-col h-full bg-background border-r w-64 p-4">
@@ -89,6 +90,13 @@ const Sidebar = () => {
             <div className="pt-4 pb-2">
               <p className="px-3 text-xs font-medium text-muted-foreground">系统管理</p>
             </div>
+            
+            <SidebarItem 
+              href="/system/users" 
+              icon={<UserCog className="h-5 w-5" />} 
+              title="管理员用户" 
+              active={pathname.startsWith('/system/users')} 
+            />
             
             <SidebarItem 
               href="/system/announcements" 

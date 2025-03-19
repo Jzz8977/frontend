@@ -44,14 +44,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 import { logAPI } from '@/lib/api';
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious 
-} from '@/components/ui/pagination';
+import { Pagination } from '@/components/ui/pagination';
 
 interface Log {
   _id: string;
@@ -371,38 +364,12 @@ export default function LogsPage() {
             </TableBody>
           </Table>
           
-          <div className="mt-4">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious 
-                    onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                    disabled={page <= 1}
-                  />
-                </PaginationItem>
-                
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNumber = i + 1;
-                  return (
-                    <PaginationItem key={i}>
-                      <PaginationLink
-                        isActive={pageNumber === page}
-                        onClick={() => setPage(pageNumber)}
-                      >
-                        {pageNumber}
-                      </PaginationLink>
-                    </PaginationItem>
-                  );
-                })}
-                
-                <PaginationItem>
-                  <PaginationNext 
-                    onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={page >= totalPages}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+          <div className="flex justify-center mt-4">
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={(newPage) => setPage(newPage)}
+            />
           </div>
         </CardContent>
       </Card>

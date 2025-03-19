@@ -48,17 +48,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Permission {
-  _id: string;
+  id: string;
   name: string;
   description: string;
   group: string;
 }
 
 interface Role {
-  _id: string;
+  id: string;
   name: string;
+  key: string;
   description: string;
-  permissions: string[];
+  permissions: Permission[];
   isDefault: boolean;
   isSystem: boolean;
   createdAt: string;
@@ -67,6 +68,7 @@ interface Role {
 
 interface RoleFormData {
   name: string;
+  key: string;
   description: string;
   permissions: string[];
   isDefault: boolean;
@@ -85,6 +87,7 @@ export default function RolesPage() {
   const form = useForm<RoleFormData>({
     defaultValues: {
       name: '',
+      key: '',
       description: '',
       permissions: [],
       isDefault: false
@@ -96,10 +99,14 @@ export default function RolesPage() {
     try {
       setLoading(true);
       const response = await roleAPI.getRoles();
-      setRoles(response.data.data);
-    } catch (error) {
+      if (response.data.success) {
+        setRoles(response.data.data.data);
+      } else {
+        toast.error('获取角色列表失败');
+      }
+    } catch (error: any) {
       console.error('获取角色列表失败:', error);
-      toast.error('获取角色列表失败');
+      toast.error(error.response?.data?.message || '获取角色列表失败');
     } finally {
       setLoading(false);
     }
@@ -109,14 +116,18 @@ export default function RolesPage() {
   const fetchPermissions = async () => {
     try {
       const response = await roleAPI.getPermissions();
-      setPermissions(response.data.data);
-      
-      // 提取所有权限组
-      const groups = Array.from(new Set(response.data.data.map((p: Permission) => p.group)));
-      setPermissionGroups(groups);
-    } catch (error) {
+      if (response.data.success) {
+        setPermissions(response.data.data.permissions);
+        
+        // 提取所有权限组
+        const groups = response.data.data.distinctGroups || [];
+        setPermissionGroups(groups);
+      } else {
+        toast.error('获取权限列表失败');
+      }
+    } catch (error: any) {
       console.error('获取权限列表失败:', error);
-      toast.error('获取权限列表失败');
+      toast.error(error.response?.data?.message || '获取权限列表失败');
     }
   };
   
@@ -129,14 +140,20 @@ export default function RolesPage() {
   // 添加新角色
   const handleAddRole = async (data: RoleFormData) => {
     try {
-      await roleAPI.createRole(data);
+      await roleAPI.createRole({
+        name: data.name,
+        key: data.key,
+        description: data.description,
+        permissions: data.permissions,
+        isDefault: data.isDefault
+      });
       toast.success('角色创建成功');
       setShowAddDialog(false);
       form.reset();
       fetchRoles();
-    } catch (error) {
+    } catch (error: any) {
       console.error('创建角色失败:', error);
-      toast.error('创建角色失败');
+      toast.error(error.response?.data?.message || '创建角色失败');
     }
   };
   
@@ -145,13 +162,18 @@ export default function RolesPage() {
     if (!currentRole) return;
     
     try {
-      await roleAPI.updateRole(currentRole._id, data);
+      await roleAPI.updateRole(currentRole.id, {
+        name: data.name,
+        description: data.description,
+        permissions: data.permissions,
+        isDefault: data.isDefault
+      });
       toast.success('角色更新成功');
       setShowEditDialog(false);
       fetchRoles();
-    } catch (error) {
+    } catch (error: any) {
       console.error('更新角色失败:', error);
-      toast.error('更新角色失败');
+      toast.error(error.response?.data?.message || '更新角色失败');
     }
   };
   
@@ -160,13 +182,13 @@ export default function RolesPage() {
     if (!currentRole) return;
     
     try {
-      await roleAPI.deleteRole(currentRole._id);
+      await roleAPI.deleteRole(currentRole.id);
       toast.success('角色删除成功');
       setShowDeleteDialog(false);
       fetchRoles();
-    } catch (error) {
+    } catch (error: any) {
       console.error('删除角色失败:', error);
-      toast.error('删除角色失败');
+      toast.error(error.response?.data?.message || '删除角色失败');
     }
   };
   
@@ -176,9 +198,9 @@ export default function RolesPage() {
       await roleAPI.setDefaultRole(roleId);
       toast.success('默认角色设置成功');
       fetchRoles();
-    } catch (error) {
+    } catch (error: any) {
       console.error('设置默认角色失败:', error);
-      toast.error('设置默认角色失败');
+      toast.error(error.response?.data?.message || '设置默认角色失败');
     }
   };
   
@@ -187,8 +209,9 @@ export default function RolesPage() {
     setCurrentRole(role);
     form.reset({
       name: role.name,
+      key: role.key,
       description: role.description,
-      permissions: role.permissions,
+      permissions: role.permissions.map(p => p.id),
       isDefault: role.isDefault
     });
     setShowEditDialog(true);
@@ -212,7 +235,7 @@ export default function RolesPage() {
   
   // 处理权限组全选/取消全选
   const handleGroupCheckboxChange = (group: string, checked: boolean) => {
-    const groupPermissionIds = getPermissionsByGroup(group).map(p => p._id);
+    const groupPermissionIds = getPermissionsByGroup(group).map(p => p.id);
     const currentPermissions = form.getValues().permissions;
     
     let newPermissions;
@@ -229,7 +252,7 @@ export default function RolesPage() {
   
   // 检查一个组内的权限是否全部选中
   const isGroupFullySelected = (group: string) => {
-    const groupPermissionIds = getPermissionsByGroup(group).map(p => p._id);
+    const groupPermissionIds = getPermissionsByGroup(group).map(p => p.id);
     const currentPermissions = form.getValues().permissions;
     
     return groupPermissionIds.every(id => currentPermissions.includes(id));
@@ -237,7 +260,7 @@ export default function RolesPage() {
   
   // 检查一个组内是否有部分权限被选中
   const isGroupPartiallySelected = (group: string) => {
-    const groupPermissionIds = getPermissionsByGroup(group).map(p => p._id);
+    const groupPermissionIds = getPermissionsByGroup(group).map(p => p.id);
     const currentPermissions = form.getValues().permissions;
     
     const hasAny = groupPermissionIds.some(id => currentPermissions.includes(id));
@@ -256,6 +279,7 @@ export default function RolesPage() {
         <Button onClick={() => {
           form.reset({
             name: '',
+            key: '',
             description: '',
             permissions: [],
             isDefault: false
@@ -296,7 +320,7 @@ export default function RolesPage() {
                 </TableRow>
               ) : (
                 roles.map((role) => (
-                  <TableRow key={role._id}>
+                  <TableRow key={role.id}>
                     <TableCell className="font-medium">
                       {role.name}
                     </TableCell>
@@ -313,7 +337,7 @@ export default function RolesPage() {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => handleSetDefault(role._id)}
+                          onClick={() => handleSetDefault(role.id)}
                           disabled={role.isSystem}
                         >
                           设为默认
@@ -381,6 +405,21 @@ export default function RolesPage() {
                         <Input placeholder="例如: 编辑人员" {...field} />
                       </FormControl>
                       <FormDescription>角色名称应当简洁明了，便于识别</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="key"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>角色标识</FormLabel>
+                      <FormControl>
+                        <Input placeholder="例如: editor" {...field} />
+                      </FormControl>
+                      <FormDescription>角色标识应当简洁明了，便于识别</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -470,23 +509,23 @@ export default function RolesPage() {
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {getPermissionsByGroup(group).map((permission) => (
                                   <FormItem
-                                    key={permission._id}
+                                    key={permission.id}
                                     className="flex flex-row items-start space-x-3 space-y-0"
                                   >
                                     <FormControl>
                                       <Checkbox
-                                        checked={isPermissionSelected(permission._id)}
+                                        checked={isPermissionSelected(permission.id)}
                                         onCheckedChange={(checked) => {
                                           const currentPermissions = form.getValues().permissions;
                                           
                                           if (checked) {
                                             // 添加权限
-                                            form.setValue('permissions', [...currentPermissions, permission._id]);
+                                            form.setValue('permissions', [...currentPermissions, permission.id]);
                                           } else {
                                             // 移除权限
                                             form.setValue(
                                               'permissions',
-                                              currentPermissions.filter(id => id !== permission._id)
+                                              currentPermissions.filter(id => id !== permission.id)
                                             );
                                           }
                                         }}
@@ -544,6 +583,20 @@ export default function RolesPage() {
                       <FormLabel>角色名称</FormLabel>
                       <FormControl>
                         <Input placeholder="例如: 编辑人员" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="key"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>角色标识</FormLabel>
+                      <FormControl>
+                        <Input placeholder="例如: editor" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -637,23 +690,23 @@ export default function RolesPage() {
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {getPermissionsByGroup(group).map((permission) => (
                                   <FormItem
-                                    key={permission._id}
+                                    key={permission.id}
                                     className="flex flex-row items-start space-x-3 space-y-0"
                                   >
                                     <FormControl>
                                       <Checkbox
-                                        checked={isPermissionSelected(permission._id)}
+                                        checked={isPermissionSelected(permission.id)}
                                         onCheckedChange={(checked) => {
                                           const currentPermissions = form.getValues().permissions;
                                           
                                           if (checked) {
                                             // 添加权限
-                                            form.setValue('permissions', [...currentPermissions, permission._id]);
+                                            form.setValue('permissions', [...currentPermissions, permission.id]);
                                           } else {
                                             // 移除权限
                                             form.setValue(
                                               'permissions',
-                                              currentPermissions.filter(id => id !== permission._id)
+                                              currentPermissions.filter(id => id !== permission.id)
                                             );
                                           }
                                         }}

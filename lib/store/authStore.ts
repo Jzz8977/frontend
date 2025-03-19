@@ -6,7 +6,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  roleKey: string;
   avatar?: string;
   registrationType: string;
 }

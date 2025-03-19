@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -33,16 +33,29 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+// 提取使用useSearchParams的部分到一个单独的客户端组件
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnUrl = searchParams.get('returnUrl');
   const { login, isLoading, error, clearError, token } = useAuthStore();
+  const [redirectionHandled, setRedirectionHandled] = useState(false);
   
-  // 路由保护：如果用户已登录，重定向到仪表盘
+  // 路由保护：如果用户已登录，重定向到之前的页面或仪表盘
   useEffect(() => {
-    if (token) {
-      router.push('/dashboard');
+    if (token && !redirectionHandled) {
+      setRedirectionHandled(true);
+      
+      if (returnUrl) {
+        // 重定向到之前的页面
+        const decodedReturnUrl = decodeURIComponent(returnUrl);
+        router.push(decodedReturnUrl);
+      } else {
+        // 默认重定向到仪表盘
+        router.push('/dashboard');
+      }
     }
-  }, [token, router]);
+  }, [token, router, returnUrl, redirectionHandled]);
   
   // 初始化表单
   const form = useForm<LoginFormValues>({
@@ -59,9 +72,10 @@ export default function LoginPage() {
     try {
       await login(data.email, data.password);
       
-      // 登录成功，跳转到仪表盘
+      // 登录成功，toast提示
       toast.success('登录成功');
-      router.push('/dashboard');
+      
+      // 重定向处理将在useEffect中完成
     } catch {
       // 错误已在store中处理
     }
@@ -75,8 +89,8 @@ export default function LoginPage() {
     }
   }, [error, clearError]);
   
-  // 如果已登录，不显示登录页面
-  if (token) {
+  // 如果已登录且已处理重定向，不显示登录页面
+  if (token && redirectionHandled) {
     return null;
   }
   
@@ -87,6 +101,7 @@ export default function LoginPage() {
           <CardTitle className="text-2xl font-bold">登录</CardTitle>
           <CardDescription>
             输入您的邮箱和密码登录
+            {returnUrl && <div className="mt-2 text-xs text-muted-foreground">登录后将返回您之前访问的页面</div>}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -146,5 +161,20 @@ export default function LoginPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+// 主页面组件，使用Suspense包裹使用useSearchParams的组件
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-tr from-slate-100 to-slate-200 p-4">
+        <div className="text-center">
+          <p className="text-lg">加载中...</p>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 } 

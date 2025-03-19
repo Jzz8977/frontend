@@ -32,10 +32,21 @@ api.interceptors.response.use(
     // 处理401错误（未授权）
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
+        // 清除认证信息
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        // 重定向到登录页
-        window.location.href = '/auth/login';
+        
+        // 仅当不在认证相关页面时才重定向
+        const currentPath = window.location.pathname;
+        if (!currentPath.includes('/auth/')) {
+          console.log('401 未授权，重定向到登录页');
+          // 添加来源URL作为查询参数，以便登录后重定向回来
+          const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+          // 使用replace而不是href避免在历史记录中堆积重定向
+          window.location.replace(`/auth/login?returnUrl=${returnUrl}`);
+        } else {
+          console.log('已在认证页面，不进行重定向');
+        }
       }
     }
     return Promise.reject(error);
@@ -65,6 +76,9 @@ export const userAPI = {
   getUsers: (page = 1, limit = 10) => 
     api.get(`/users?page=${page}&limit=${limit}`),
     
+  getAdminUsers: (page = 1, limit = 10, search = '') => 
+    api.get(`/users/admins?page=${page}&limit=${limit}&search=${search}`),
+    
   getUser: (id: string) => 
     api.get(`/users/${id}`),
     
@@ -72,7 +86,7 @@ export const userAPI = {
     name: string;
     email: string;
     password: string;
-    role?: string;
+    roleKey?: string;
     avatar?: string;
     isActive?: boolean;
   }) => 
@@ -81,9 +95,10 @@ export const userAPI = {
   updateUser: (id: string, data: {
     name?: string;
     email?: string;
-    role?: string;
+    roleKey?: string;
     avatar?: string;
     isActive?: boolean;
+    password?: string;
   }) => 
     api.put(`/users/${id}`, data),
     
@@ -91,7 +106,7 @@ export const userAPI = {
     api.delete(`/users/${id}`),
     
   updatePassword: (data: { currentPassword: string; newPassword: string }) => 
-    api.put('/users/password/update', data),
+    api.put('/users/password', data),
 };
 
 // 产品相关API
@@ -239,10 +254,22 @@ export const roleAPI = {
   getRole: (id: string) => 
     api.get(`/roles/${id}`),
     
-  createRole: (data: { name: string; description: string; permissions: string[] }) => 
+  createRole: (data: { 
+    name: string; 
+    key: string; 
+    description: string; 
+    permissions: string[];
+    isDefault?: boolean;
+  }) => 
     api.post('/roles', data),
     
-  updateRole: (id: string, data: { name?: string; description?: string; permissions?: string[] }) => 
+  updateRole: (id: string, data: { 
+    name?: string; 
+    key?: string;
+    description?: string; 
+    permissions?: string[];
+    isDefault?: boolean;
+  }) => 
     api.put(`/roles/${id}`, data),
     
   deleteRole: (id: string) => 
@@ -276,6 +303,54 @@ export const permissionAPI = {
     
   deletePermission: (id: string) => 
     api.delete(`/permissions/${id}`),
+};
+
+// 模块管理API
+export const moduleAPI = {
+  getModules: (page = 1, limit = 20, search?: string) => {
+    let url = `/modules?page=${page}&limit=${limit}`;
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+    }
+    return api.get(url);
+  },
+  
+  getModule: (id: string) => 
+    api.get(`/modules/${id}`),
+  
+  createModule: (data: {
+    name: string;
+    key: string;
+    description?: string;
+    icon?: string;
+    path?: string;
+    sortOrder?: number;
+    isSystem?: boolean;
+    isActive?: boolean;
+    permissions?: string[];
+  }) => 
+    api.post('/modules', data),
+    
+  updateModule: (id: string, data: {
+    name?: string;
+    description?: string;
+    icon?: string;
+    path?: string;
+    sortOrder?: number;
+    isActive?: boolean;
+    permissions?: string[];
+  }) => 
+    api.put(`/modules/${id}`, data),
+    
+  toggleModuleStatus: (id: string) => 
+    api.patch(`/modules/${id}/toggle-status`),
+    
+  deleteModule: (id: string) => 
+    api.delete(`/modules/${id}`),
+    
+  // 获取菜单配置
+  getMenuStructure: () => 
+    api.get('/modules/menu-structure'),
 };
 
 // 公告管理API
